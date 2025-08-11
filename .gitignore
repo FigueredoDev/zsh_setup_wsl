@@ -1,0 +1,49 @@
+# Logs
+*.log
+setup.log
+
+# Ambiente
+.env
+.env.local
+.env.production
+.env.staging
+
+# Backups
+*.backup.*
+*~
+
+# Temporários
+/tmp/
+*.tmp
+*.temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Arquivos pessoais de teste
+test-personal/
+my-config/
