@@ -43,7 +43,7 @@ Um projeto completo para configurar rapidamente um ambiente de desenvolvimento W
 ### Instalação Padrão (Completa)
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/zsh-setup.git
+git clone https://github.com/FigueredoDev/zsh_setup_wsl.git
 cd zsh-setup
 
 # Torne o script executável
