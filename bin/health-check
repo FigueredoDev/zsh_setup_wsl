@@ -4,7 +4,7 @@
 # Verifica e corrige problemas no ambiente de desenvolvimento
 # ============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 # Configurações
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -169,7 +169,7 @@ check_dev_tools() {
     run_health_check "Curl instalado" "command -v curl" "sudo apt install -y curl" true
     run_health_check "Wget instalado" "command -v wget" "sudo apt install -y wget" false
     run_health_check "Build essentials" "dpkg -s build-essential" "sudo apt install -y build-essential" false
-    run_health_check "Bat instalado" "command -v bat" "sudo apt install -y bat" false
+    run_health_check "Bat instalado" "which bat >/dev/null 2>&1" "sudo apt install -y bat" false
     run_health_check "Exa instalado" "command -v exa" "sudo apt install -y exa" false
     run_health_check "Ripgrep instalado" "command -v rg" "sudo apt install -y ripgrep" false
     run_health_check "FZF instalado" "command -v fzf" "sudo apt install -y fzf" false
@@ -343,7 +343,21 @@ main() {
     # Gerar relatório
     generate_health_report
     
-    # Tentar correções se solicitado
+    # Se há problemas e não é auto_fix, perguntar ao usuário
+    if [[ $failed_checks -gt 0 && "$auto_fix" != "true" ]]; then
+        echo ""
+        echo -e "${YELLOW}🤔 Problemas detectados. Deseja tentar corrigi-los automaticamente?${NC}"
+        read -p "Digite 'y' para corrigir ou qualquer tecla para sair: " -n 1 -r
+        echo ""
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${BLUE}🔧 Iniciando correções automáticas...${NC}"
+            auto_fix="true"
+        fi
+    fi
+    
+    # Tentar correções se solicitado ou aceito pelo usuário
     if [[ "$auto_fix" == "true" ]]; then
         fix_issues
         
