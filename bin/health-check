@@ -169,10 +169,19 @@ check_dev_tools() {
     run_health_check "Curl instalado" "command -v curl" "sudo apt install -y curl" true
     run_health_check "Wget instalado" "command -v wget" "sudo apt install -y wget" false
     run_health_check "Build essentials" "dpkg -s build-essential" "sudo apt install -y build-essential" false
-    run_health_check "Bat instalado" "which bat >/dev/null 2>&1" "sudo apt install -y bat" false
-    run_health_check "Exa instalado" "command -v exa" "sudo apt install -y exa" false
-    run_health_check "Ripgrep instalado" "command -v rg" "sudo apt install -y ripgrep" false
-    run_health_check "FZF instalado" "command -v fzf" "sudo apt install -y fzf" false
+    
+    # Verificar utilitários modernos apenas se estiverem habilitados
+    if [[ "${INSTALL_MODERN_UTILS:-true}" == "true" ]]; then
+        echo ""
+        echo -e "${BLUE}⚡ Verificando utilitários modernos (opcionais)...${NC}"
+        run_health_check "Bat instalado" "which bat >/dev/null 2>&1" "sudo apt install -y bat" false
+        run_health_check "Exa instalado" "command -v exa" "sudo apt install -y exa" false
+        run_health_check "Ripgrep instalado" "command -v rg" "sudo apt install -y ripgrep" false
+        run_health_check "FZF instalado" "command -v fzf" "sudo apt install -y fzf" false
+    else
+        echo ""
+        echo -e "${BLUE}⚡ Utilitários modernos: ${YELLOW}Desabilitados${NC} (INSTALL_MODERN_UTILS=false)"
+    fi
 }
 
 # Verificações de permissões e arquivos
@@ -191,12 +200,12 @@ check_permissions() {
 # Função para tentar corrigir problemas
 fix_issues() {
     if [[ ${#fixable_issues[@]} -eq 0 ]]; then
-        log_info "Nenhum problema corrigível encontrado."
+        log_info "Nenhuma melhoria disponível para instalação."
         return 0
     fi
     
     echo ""
-    echo -e "${YELLOW}🔧 Problemas que podem ser corrigidos automaticamente:${NC}"
+    echo -e "${YELLOW}🔧 Ferramentas opcionais que podem ser instaladas:${NC}"
     echo ""
     
     local count=1
@@ -207,34 +216,34 @@ fix_issues() {
     done
     
     echo ""
-    read -p "Deseja tentar corrigir estes problemas automaticamente? (y/N): " -n 1 -r
+    read -p "Deseja instalar estas ferramentas opcionais? (y/N): " -n 1 -r
     echo ""
     
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Correção automática cancelada pelo usuário"
+        log_info "Instalação cancelada pelo usuário"
         return 0
     fi
     
     echo ""
-    log_health "Iniciando correção automática..."
+    log_health "Iniciando instalação de ferramentas opcionais..."
     
     for issue in "${fixable_issues[@]}"; do
         local issue_name="${issue%%:*}"
         local fix_command="${issue#*:}"
         
         echo ""
-        echo -e "${YELLOW}🔧 Corrigindo: $issue_name${NC}"
+        echo -e "${YELLOW}🔧 Instalando: $issue_name${NC}"
         
         if eval "$fix_command"; then
-            echo -e "${GREEN}✅ $issue_name corrigido${NC}"
+            echo -e "${GREEN}✅ $issue_name instalado${NC}"
             fixed_issues=$((fixed_issues + 1))
         else
-            echo -e "${RED}❌ Falha ao corrigir $issue_name${NC}"
+            echo -e "${RED}❌ Falha ao instalar $issue_name${NC}"
         fi
     done
     
     echo ""
-    log_health "Correção automática concluída. $fixed_issues problemas foram corrigidos."
+    log_health "Instalação concluída. $fixed_issues ferramentas foram instaladas."
     
     if [[ $fixed_issues -gt 0 ]]; then
         echo ""
@@ -255,7 +264,7 @@ generate_health_report() {
     echo "======================================================================"
     echo ""
     echo -e "${GREEN}✅ Verificações aprovadas:${NC} $passed_checks/$total_checks"
-    echo -e "${YELLOW}⚠️  Problemas encontrados:${NC} $failed_checks"
+    echo -e "${YELLOW}🔧 Melhorias disponíveis:${NC} $failed_checks"
     
     if [[ $fixed_issues -gt 0 ]]; then
         echo -e "${BLUE}🔧 Problemas corrigidos:${NC} $fixed_issues"
@@ -276,14 +285,22 @@ generate_health_report() {
     
     if [[ $failed_checks -gt 0 ]]; then
         echo ""
-        echo -e "${YELLOW}📋 Problemas encontrados:${NC}"
+        echo -e "${YELLOW}📋 Itens que podem ser melhorados:${NC}"
         for issue in "${issues_found[@]}"; do
-            echo "   • $issue"
+            # Classificar se é crítico ou opcional
+            case "$issue" in
+                "Bat instalado"|"Exa instalado"|"Ripgrep instalado"|"FZF instalado")
+                    echo -e "   🔧 $issue ${BLUE}(opcional - melhora experiência)${NC}"
+                    ;;
+                *)
+                    echo "   ⚠️ $issue"
+                    ;;
+            esac
         done
         
         if [[ ${#fixable_issues[@]} -gt 0 ]]; then
             echo ""
-            echo -e "${BLUE}💡 Execute 'health-check --fix' para tentar corrigir automaticamente.${NC}"
+            echo -e "${BLUE}💡 Execute 'health-check --fix' para instalar melhorias opcionais.${NC}"
         fi
     fi
     
@@ -343,16 +360,16 @@ main() {
     # Gerar relatório
     generate_health_report
     
-    # Se há problemas e não é auto_fix, perguntar ao usuário
+    # Se há melhorias disponíveis e não é auto_fix, perguntar ao usuário
     if [[ $failed_checks -gt 0 && "$auto_fix" != "true" ]]; then
         echo ""
-        echo -e "${YELLOW}🤔 Problemas detectados. Deseja tentar corrigi-los automaticamente?${NC}"
-        read -p "Digite 'y' para corrigir ou qualquer tecla para sair: " -n 1 -r
+        echo -e "${YELLOW}🔧 Melhorias opcionais disponíveis. Deseja instalar as ferramentas sugeridas?${NC}"
+        read -p "Digite 'y' para instalar ou qualquer tecla para sair: " -n 1 -r
         echo ""
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
-            echo -e "${BLUE}🔧 Iniciando correções automáticas...${NC}"
+            echo -e "${BLUE}🔧 Instalando ferramentas opcionais...${NC}"
             auto_fix="true"
         fi
     fi

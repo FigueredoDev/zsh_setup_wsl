@@ -186,9 +186,13 @@ main() {
     install_gemini_cli
     configure_gpg
     
-    # Instalar utilitários de desenvolvimento
-    install_dev_utilities
-    create_utility_aliases
+    # Instalar utilitários de desenvolvimento (se habilitados)
+    if [[ "${INSTALL_MODERN_UTILS:-false}" == "true" ]]; then
+        install_dev_utilities
+        create_utility_aliases
+    else
+        log_info "Utilitários modernos desabilitados (INSTALL_MODERN_UTILS=false)"
+    fi
     
     # Instalar ferramentas opcionais (se habilitadas)
     install_docker
