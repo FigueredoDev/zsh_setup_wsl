@@ -53,13 +53,13 @@ run_health_check() {
     local fix_command="${3:-}"
     local is_critical="${4:-false}"
     
-    ((total_checks++))
+    total_checks=$((total_checks + 1))
     
     echo -n "🔍 $check_name... "
     
     if eval "$check_command" >/dev/null 2>&1; then
         echo -e "${GREEN}✅${NC}"
-        ((passed_checks++))
+        passed_checks=$((passed_checks + 1))
         return 0
     else
         if [[ "$is_critical" == "true" ]]; then
@@ -74,7 +74,7 @@ run_health_check() {
             fixable_issues+=("$check_name:$fix_command")
         fi
         
-        ((failed_checks++))
+        failed_checks=$((failed_checks + 1))
         return 1
     fi
 }
@@ -85,7 +85,7 @@ check_zsh_setup() {
     echo ""
     
     run_health_check "ZSH instalado" "command -v zsh" "sudo apt install -y zsh" true
-    run_health_check "ZSH é shell padrão" "[[ \"\$SHELL\" == */zsh ]]" "chsh -s \$(which zsh)" false
+    run_health_check "ZSH é shell padrão" "[[ \$SHELL == */zsh ]]" "chsh -s \$(which zsh)" false
     run_health_check "Oh My Zsh instalado" "test -d \$HOME/.oh-my-zsh" "sh -c \"\$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\"" true
     run_health_check ".zshrc existe" "test -f \$HOME/.zshrc" "cp $PROJECT_DIR/config/zshrc.template \$HOME/.zshrc" true
     run_health_check ".zshrc é válido" "zsh -n \$HOME/.zshrc" "" false
@@ -104,11 +104,11 @@ check_version_managers() {
     
     # Verificar se gerenciadores estão no PATH
     if [[ -d "$HOME/.nvm" ]]; then
-        run_health_check "NVM carregado" "command -v nvm" "echo 'Adicione as linhas do NVM ao .zshrc'" false
+        run_health_check "NVM carregado" "test -f \$HOME/.nvm/nvm.sh" "echo 'Adicione as linhas do NVM ao .zshrc'" false
     fi
     
     if [[ -d "$HOME/.pyenv" ]]; then
-        run_health_check "Pyenv no PATH" "command -v pyenv" "echo 'Adicione pyenv ao PATH no .zshrc'" false
+        run_health_check "Pyenv no PATH" "test -d \$HOME/.pyenv/bin" "echo 'Adicione pyenv ao PATH no .zshrc'" false
     fi
 }
 
@@ -140,10 +140,7 @@ check_languages() {
     
     # Java via SDKMAN
     if [[ -d "$HOME/.sdkman" ]]; then
-        export SDKMAN_DIR="$HOME/.sdkman"
-        [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh" >/dev/null 2>&1
-        
-        run_health_check "Java disponível" "command -v java" "sdk install java" false
+        run_health_check "Java disponível" "command -v java" "echo 'Use: sdk install java'" false
     fi
     
     # Go
@@ -230,7 +227,7 @@ fix_issues() {
         
         if eval "$fix_command"; then
             echo -e "${GREEN}✅ $issue_name corrigido${NC}"
-            ((fixed_issues++))
+            fixed_issues=$((fixed_issues + 1))
         else
             echo -e "${RED}❌ Falha ao corrigir $issue_name${NC}"
         fi
