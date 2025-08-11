@@ -167,6 +167,34 @@ generate_report() {
     echo "======================================================================"
 }
 
+# Validar recursos da versão 1.2
+validate_v12_features() {
+    log_info "Validando recursos v1.2..."
+    
+    # Validar sistema de backup
+    run_test "Sistema de backup disponível" "test -f '$SCRIPT_DIR/tools/backup-system.sh'"
+    run_test "Sistema de backup executável" "test -x '$SCRIPT_DIR/tools/backup-system.sh'"
+    
+    # Validar health check
+    run_test "Health check disponível" "test -f '$SCRIPT_DIR/bin/health-check'"
+    run_test "Health check executável" "test -x '$SCRIPT_DIR/bin/health-check'"
+    
+    # Validar setup interativo
+    run_test "Setup interativo disponível" "test -f '$SCRIPT_DIR/tools/interactive-setup.sh'"
+    run_test "Setup interativo executável" "test -x '$SCRIPT_DIR/tools/interactive-setup.sh'"
+    
+    # Validar integração com setup principal
+    run_test "Setup suporta --interactive" "grep -q '\\-\\-interactive' '$SCRIPT_DIR/setup.sh'"
+    run_test "Setup suporta --backup" "grep -q '\\-\\-backup' '$SCRIPT_DIR/setup.sh'"
+    run_test "Setup suporta --rollback" "grep -q '\\-\\-rollback' '$SCRIPT_DIR/setup.sh'"
+    run_test "Setup suporta --health-check" "grep -q '\\-\\-health-check' '$SCRIPT_DIR/setup.sh'"
+    
+    # Testar funcionalidade básica dos novos scripts (sem executar)
+    run_test "Backup system help" "$SCRIPT_DIR/tools/backup-system.sh --help >/dev/null 2>&1"
+    run_test "Health check help" "$SCRIPT_DIR/bin/health-check --help >/dev/null 2>&1"
+    run_test "Interactive setup help" "$SCRIPT_DIR/tools/interactive-setup.sh --help >/dev/null 2>&1"
+}
+
 # Função principal
 main() {
     log_info "Iniciando validação da instalação..."
@@ -179,6 +207,7 @@ main() {
     validate_dev_tools
     validate_configurations
     validate_custom_functions
+    validate_v12_features
     
     # Gerar relatório
     generate_report

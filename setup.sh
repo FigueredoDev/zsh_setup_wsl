@@ -5,7 +5,7 @@
 # Autor: HyperX 
 # Descrição: Script automatizado para configurar ambiente de desenvolvimento
 # Sistema: WSL2 (Debian/Ubuntu)
-# Uso: ./setup.sh [--profile PROFILE_NAME] [--list-profiles] [--help]
+# Uso: ./setup.sh [--profile PROFILE_NAME] [--interactive] [--backup] [--rollback] [--health-check] [--list-profiles] [--help]
 # ============================================================================
 
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
@@ -112,11 +112,15 @@ load_profile() {
 
 # Função para mostrar ajuda
 show_help() {
-    echo -e "${PURPLE}WSL ZSH Development Environment Setup${NC}"
+    echo -e "${PURPLE}WSL ZSH Development Environment Setup v1.2${NC}"
     echo ""
     echo -e "${YELLOW}Uso:${NC}"
     echo "  ./setup.sh                    Instalação padrão (perfil full)"
     echo "  ./setup.sh --profile NOME     Usar perfil específico"
+    echo "  ./setup.sh --interactive      Modo interativo com menu"
+    echo "  ./setup.sh --backup           Criar backup do estado atual"
+    echo "  ./setup.sh --rollback         Gerenciar backups e rollbacks"
+    echo "  ./setup.sh --health-check     Verificar saúde do ambiente"
     echo "  ./setup.sh --list-profiles    Listar perfis disponíveis"
     echo "  ./setup.sh --help             Mostrar esta ajuda"
     echo ""
@@ -124,7 +128,13 @@ show_help() {
     echo "  ./setup.sh --profile minimal     Setup mínimo (ZSH + Node.js)"
     echo "  ./setup.sh --profile frontend    Setup para desenvolvimento frontend"
     echo "  ./setup.sh --profile backend     Setup para desenvolvimento backend"
-    echo "  ./setup.sh --profile full        Setup completo (padrão)"
+    echo "  ./setup.sh --interactive         Escolher componentes individualmente"
+    echo "  ./setup.sh --health-check --fix  Verificar e corrigir problemas"
+    echo ""
+    echo -e "${YELLOW}Ferramentas de Manutenção:${NC}"
+    echo "  health-check                     Verificador de saúde (após instalação)"
+    echo "  health-check --fix               Corrigir problemas automaticamente"
+    echo "  tools/backup-system.sh --list   Listar backups disponíveis"
     echo ""
 }
 
@@ -140,6 +150,38 @@ process_arguments() {
                     log_error "Argumento --profile requer um nome de perfil"
                     exit 1
                 fi
+                ;;
+            --interactive)
+                log_info "Iniciando modo interativo..."
+                "$SCRIPT_DIR/tools/interactive-setup.sh"
+                exit 0
+                ;;
+            --backup)
+                log_info "Criando backup do estado atual..."
+                "$SCRIPT_DIR/tools/backup-system.sh" --create "manual_$(date +%Y%m%d_%H%M%S)"
+                exit 0
+                ;;
+            --rollback)
+                log_info "Gerenciador de backups e rollback..."
+                echo ""
+                echo -e "${YELLOW}Backups disponíveis:${NC}"
+                "$SCRIPT_DIR/tools/backup-system.sh" --list
+                echo ""
+                echo -e "${BLUE}Para restaurar:${NC}"
+                echo "  tools/backup-system.sh --restore SESSION_NAME"
+                echo "  tools/backup-system.sh --restore-component SESSION_NAME COMPONENT"
+                exit 0
+                ;;
+            --health-check)
+                # Verificar se existe --fix como próximo argumento
+                if [[ "${2:-}" == "--fix" ]]; then
+                    "$SCRIPT_DIR/bin/health-check" --fix
+                    shift
+                else
+                    "$SCRIPT_DIR/bin/health-check"
+                fi
+                shift
+                exit 0
                 ;;
             --list-profiles)
                 list_profiles
@@ -169,13 +211,21 @@ main() {
     # Processar argumentos primeiro (pode sair do script para --help, --list-profiles)
     process_arguments "$@"
     
-    log "🚀 Iniciando setup do ambiente de desenvolvimento WSL"
+    log "🚀 Iniciando setup do ambiente de desenvolvimento WSL v1.2"
     log "📁 Diretório do script: $SCRIPT_DIR"
     
     # Mostrar perfil selecionado
     if [[ -n "$SELECTED_PROFILE" ]]; then
         log "🎯 Perfil selecionado: $SELECTED_PROFILE"
         [[ -n "${PROFILE_DESCRIPTION:-}" ]] && log_info "$PROFILE_DESCRIPTION"
+    fi
+    
+    # Criar backup automático antes da instalação
+    log "📦 Criando backup automático do estado atual..."
+    if "$SCRIPT_DIR/tools/backup-system.sh" --create "auto_${SELECTED_PROFILE}_$(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+        log_info "Backup automático criado com sucesso"
+    else
+        log_warning "Falha ao criar backup automático, continuando sem backup..."
     fi
     
     # Verificar se é WSL
@@ -229,6 +279,14 @@ main() {
     log "🔄 Reinicie seu terminal ou execute: source ~/.zshrc"
     log "📋 Log completo salvo em: $LOG_FILE"
     
+    # Executar health check final
+    log "🏥 Executando verificação final do ambiente..."
+    if "$SCRIPT_DIR/bin/health-check" >/dev/null 2>&1; then
+        log_info "Health check: Ambiente configurado corretamente ✅"
+    else
+        log_warning "Health check: Alguns problemas foram detectados. Execute: health-check --fix"
+    fi
+    
     # Mostrar próximos passos
     show_next_steps
 }
@@ -242,7 +300,12 @@ show_next_steps() {
     echo -e "   ${BLUE}•${NC} Node.js: ${GREEN}nvm install --lts${NC}"
     echo -e "   ${BLUE}•${NC} Python: ${GREEN}pyenv install 3.11.0${NC}"
     echo -e "   ${BLUE}•${NC} Java: ${GREEN}sdk install java 17.0.8-amzn${NC}"
-    echo -e "${YELLOW}4.${NC} Execute o teste de validação: ${GREEN}$INSTALL_DIR/validate.sh${NC}"
+    echo ""
+    echo -e "${PURPLE}=================== FERRAMENTAS v1.2 ===================${NC}"
+    echo -e "${BLUE}🏥 Health Check:${NC} ${GREEN}health-check${NC} ou ${GREEN}health-check --fix${NC}"
+    echo -e "${BLUE}📦 Backup:${NC} ${GREEN}tools/backup-system.sh --list${NC}"
+    echo -e "${BLUE}🔄 Rollback:${NC} ${GREEN}tools/backup-system.sh --restore SESSION${NC}"
+    echo -e "${BLUE}🔧 Setup Interativo:${NC} ${GREEN}./setup.sh --interactive${NC}"
     echo -e "${PURPLE}=======================================================${NC}"
 }
 

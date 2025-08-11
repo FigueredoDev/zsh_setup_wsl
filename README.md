@@ -1,4 +1,4 @@
-# 🚀 WSL ZSH Development Environment Setup
+# 🚀 WSL ZSH Development Environment Setup v1.2
 
 Um projeto completo para configurar rapidamente um ambiente de desenvolvimento WSL com ZSH, ferramentas modernas e configurações otimizadas.
 
@@ -20,6 +20,14 @@ Um projeto completo para configurar rapidamente um ambiente de desenvolvimento W
 
 ## ✨ Recursos
 
+### 🆕 Novidades v1.2  
+- **🎛️ Setup Interativo**: Interface CLI intuitiva para escolha de componentes
+- **🏥 Health Check**: Verificação e correção automática do ambiente
+- **📦 Sistema de Backup**: Backup automático e rollback por componente
+- **🔄 Rollback Inteligente**: Restauração completa ou seletiva
+- **🛠️ Ferramentas de Manutenção**: Scripts integrados para monitoramento
+
+### 🌟 Recursos Base
 - **🎯 Perfis Inteligentes**: 4 perfis otimizados (Minimal, Frontend, Backend, Full)
 - **⚡ Setup Automatizado**: Instalação completa com um único comando
 - **🔄 Versões LTS Automáticas**: Sempre instala as versões mais estáveis por padrão
@@ -66,6 +74,50 @@ chmod +x setup.sh
 
 # Ver todas as opções
 ./setup.sh --help
+```
+
+## 🆕 Funcionalidades v1.2
+
+### 🎛️ Setup Interativo
+Interface intuitiva para escolher componentes específicos:
+
+```bash
+# Modo interativo com menu visual
+./setup.sh --interactive
+```
+
+### 🏥 Health Check  
+Verificação completa do ambiente com correção automática:
+
+```bash
+# Verificação simples
+health-check
+
+# Verificação com correção automática
+health-check --fix
+
+# Via setup principal
+./setup.sh --health-check --fix
+```
+
+### 📦 Sistema de Backup & Rollback
+Backup automático e restauração inteligente:
+
+```bash
+# Criar backup manual
+./setup.sh --backup
+
+# Listar backups
+tools/backup-system.sh --list
+
+# Rollback completo
+tools/backup-system.sh --restore SESSION_NAME
+
+# Rollback por componente
+tools/backup-system.sh --restore-component SESSION_NAME nvm
+
+# Gerenciar via setup
+./setup.sh --rollback
 ```
 
 ## ⚙️ Configuração

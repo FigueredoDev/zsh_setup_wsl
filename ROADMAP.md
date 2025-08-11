@@ -9,14 +9,14 @@
 - ✅ Backup automático
 - ✅ **Sistema de perfis** (minimal, frontend, backend, full)
 
-## 🚀 Versão 1.2 (Próxima)
-- [ ] Setup interativo com menu
-- [ ] Sistema de rollback
-- [ ] Detecção de ambiente/projeto
-- [ ] Health check periódico
+## ✅ Versão 1.2 (Atual)
+- ✅ Setup interativo com menu
+- ✅ Sistema de rollback
+- ✅ Health check (manual)
+- ✅ Sistema de backup automático
+- ✅ Integração com setup principal
 
-## 🔮 Versão 1.2 (Futura)
-- [ ] Health check periódico
+## 🔮 Versão 1.3 (Futura)
 - [ ] Configurações por workspace
 - [ ] Cache de downloads
 - [ ] Integração com IDEs

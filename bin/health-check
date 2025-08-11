@@ -1,0 +1,385 @@
+#!/bin/bash
+# ============================================================================
+# WSL Development Environment Health Check
+# Verifica e corrige problemas no ambiente de desenvolvimento
+# ============================================================================
+
+set -euo pipefail
+
+# Configurações
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+HEALTH_LOG="$HOME/.zsh_setup_health.log"
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+NC='\033[0m' # No Color
+
+# Contadores
+total_checks=0
+passed_checks=0
+failed_checks=0
+fixed_issues=0
+
+# Arrays para armazenar resultados
+declare -a issues_found
+declare -a fixable_issues
+
+# Função de logging
+log_health() {
+    echo -e "${GREEN}[HEALTH $(date +'%H:%M:%S')]${NC} $1" | tee -a "$HEALTH_LOG"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR $(date +'%H:%M:%S')]${NC} $1" | tee -a "$HEALTH_LOG"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING $(date +'%H:%M:%S')]${NC} $1" | tee -a "$HEALTH_LOG"
+}
+
+log_info() {
+    echo -e "${BLUE}[INFO $(date +'%H:%M:%S')]${NC} $1" | tee -a "$HEALTH_LOG"
+}
+
+# Função para executar teste
+run_health_check() {
+    local check_name="$1"
+    local check_command="$2"
+    local fix_command="${3:-}"
+    local is_critical="${4:-false}"
+    
+    ((total_checks++))
+    
+    echo -n "🔍 $check_name... "
+    
+    if eval "$check_command" >/dev/null 2>&1; then
+        echo -e "${GREEN}✅${NC}"
+        ((passed_checks++))
+        return 0
+    else
+        if [[ "$is_critical" == "true" ]]; then
+            echo -e "${RED}❌ (CRÍTICO)${NC}"
+        else
+            echo -e "${YELLOW}⚠️${NC}"
+        fi
+        
+        issues_found+=("$check_name")
+        
+        if [[ -n "$fix_command" ]]; then
+            fixable_issues+=("$check_name:$fix_command")
+        fi
+        
+        ((failed_checks++))
+        return 1
+    fi
+}
+
+# Verificações de ZSH e Oh My Zsh
+check_zsh_setup() {
+    echo -e "${BLUE}🐚 Verificando configuração ZSH...${NC}"
+    echo ""
+    
+    run_health_check "ZSH instalado" "command -v zsh" "sudo apt install -y zsh" true
+    run_health_check "ZSH é shell padrão" "[[ \"\$SHELL\" == */zsh ]]" "chsh -s \$(which zsh)" false
+    run_health_check "Oh My Zsh instalado" "test -d \$HOME/.oh-my-zsh" "sh -c \"\$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\"" true
+    run_health_check ".zshrc existe" "test -f \$HOME/.zshrc" "cp $PROJECT_DIR/config/zshrc.template \$HOME/.zshrc" true
+    run_health_check ".zshrc é válido" "zsh -n \$HOME/.zshrc" "" false
+    run_health_check "Tema Spaceship instalado" "test -d \$HOME/.oh-my-zsh/custom/themes/spaceship-prompt" "git clone https://github.com/spaceship-prompt/spaceship-prompt.git \$HOME/.oh-my-zsh/custom/themes/spaceship-prompt --depth=1" false
+}
+
+# Verificações de gerenciadores de versão
+check_version_managers() {
+    echo ""
+    echo -e "${BLUE}📦 Verificando gerenciadores de versão...${NC}"
+    echo ""
+    
+    run_health_check "NVM instalado" "test -d \$HOME/.nvm" "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash" false
+    run_health_check "Pyenv instalado" "test -d \$HOME/.pyenv" "curl https://pyenv.run | bash" false
+    run_health_check "SDKMAN instalado" "test -d \$HOME/.sdkman" "curl -s \"https://get.sdkman.io\" | bash" false
+    
+    # Verificar se gerenciadores estão no PATH
+    if [[ -d "$HOME/.nvm" ]]; then
+        run_health_check "NVM carregado" "command -v nvm" "echo 'Adicione as linhas do NVM ao .zshrc'" false
+    fi
+    
+    if [[ -d "$HOME/.pyenv" ]]; then
+        run_health_check "Pyenv no PATH" "command -v pyenv" "echo 'Adicione pyenv ao PATH no .zshrc'" false
+    fi
+}
+
+# Verificações de linguagens
+check_languages() {
+    echo ""
+    echo -e "${BLUE}💻 Verificando linguagens de desenvolvimento...${NC}"  
+    echo ""
+    
+    # Node.js via NVM
+    if [[ -d "$HOME/.nvm" ]]; then
+        # Carregar NVM para testes
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+        
+        run_health_check "Node.js disponível" "command -v node" "nvm install --lts" false
+        run_health_check "NPM disponível" "command -v npm" "nvm install --lts" false
+    fi
+    
+    # Python via Pyenv
+    if [[ -d "$HOME/.pyenv" ]]; then
+        export PYENV_ROOT="$HOME/.pyenv"
+        [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)" >/dev/null 2>&1 || true
+        
+        run_health_check "Python disponível" "command -v python" "" false
+        run_health_check "Pip disponível" "command -v pip" "" false
+    fi
+    
+    # Java via SDKMAN
+    if [[ -d "$HOME/.sdkman" ]]; then
+        export SDKMAN_DIR="$HOME/.sdkman"
+        [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh" >/dev/null 2>&1
+        
+        run_health_check "Java disponível" "command -v java" "sdk install java" false
+    fi
+    
+    # Go
+    run_health_check "Go instalado" "test -d /usr/local/go" "" false
+    run_health_check "Go no PATH" "command -v go" "echo 'Adicione Go ao PATH'" false
+}
+
+# Verificações de Git
+check_git_config() {
+    echo ""
+    echo -e "${BLUE}🔧 Verificando configuração Git...${NC}"
+    echo ""
+    
+    run_health_check "Git instalado" "command -v git" "sudo apt install -y git" true
+    run_health_check "Git user.name configurado" "git config --global user.name" "" false
+    run_health_check "Git user.email configurado" "git config --global user.email" "" false
+    run_health_check "Aliases Git configurados" "git config --global alias.s" "git config --global alias.s 'status -s'" false
+}
+
+# Verificações de ferramentas de desenvolvimento
+check_dev_tools() {
+    echo ""
+    echo -e "${BLUE}🛠️ Verificando ferramentas de desenvolvimento...${NC}"
+    echo ""
+    
+    run_health_check "Curl instalado" "command -v curl" "sudo apt install -y curl" true
+    run_health_check "Wget instalado" "command -v wget" "sudo apt install -y wget" false
+    run_health_check "Build essentials" "dpkg -s build-essential" "sudo apt install -y build-essential" false
+    run_health_check "Bat instalado" "command -v bat" "sudo apt install -y bat" false
+    run_health_check "Exa instalado" "command -v exa" "sudo apt install -y exa" false
+    run_health_check "Ripgrep instalado" "command -v rg" "sudo apt install -y ripgrep" false
+    run_health_check "FZF instalado" "command -v fzf" "sudo apt install -y fzf" false
+}
+
+# Verificações de permissões e arquivos
+check_permissions() {
+    echo ""
+    echo -e "${BLUE}🔒 Verificando permissões...${NC}"
+    echo ""
+    
+    run_health_check "Permissões .zshrc corretas" "[[ \$(stat -c %a \$HOME/.zshrc 2>/dev/null || echo 000) == 644 ]]" "chmod 644 \$HOME/.zshrc" false
+    
+    if [[ -d "$HOME/.ssh" ]]; then
+        run_health_check "Permissões SSH corretas" "[[ \$(stat -c %a \$HOME/.ssh) == 700 ]]" "chmod 700 \$HOME/.ssh && chmod 600 \$HOME/.ssh/id_* 2>/dev/null || true" false
+    fi
+}
+
+# Função para tentar corrigir problemas
+fix_issues() {
+    if [[ ${#fixable_issues[@]} -eq 0 ]]; then
+        log_info "Nenhum problema corrigível encontrado."
+        return 0
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}🔧 Problemas que podem ser corrigidos automaticamente:${NC}"
+    echo ""
+    
+    local count=1
+    for issue in "${fixable_issues[@]}"; do
+        local issue_name="${issue%%:*}"
+        echo "  $count. $issue_name"
+        ((count++))
+    done
+    
+    echo ""
+    read -p "Deseja tentar corrigir estes problemas automaticamente? (y/N): " -n 1 -r
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Correção automática cancelada pelo usuário"
+        return 0
+    fi
+    
+    echo ""
+    log_health "Iniciando correção automática..."
+    
+    for issue in "${fixable_issues[@]}"; do
+        local issue_name="${issue%%:*}"
+        local fix_command="${issue#*:}"
+        
+        echo ""
+        echo -e "${YELLOW}🔧 Corrigindo: $issue_name${NC}"
+        
+        if eval "$fix_command"; then
+            echo -e "${GREEN}✅ $issue_name corrigido${NC}"
+            ((fixed_issues++))
+        else
+            echo -e "${RED}❌ Falha ao corrigir $issue_name${NC}"
+        fi
+    done
+    
+    echo ""
+    log_health "Correção automática concluída. $fixed_issues problemas foram corrigidos."
+    
+    if [[ $fixed_issues -gt 0 ]]; then
+        echo ""
+        echo -e "${BLUE}💡 Recomendação: Execute 'source ~/.zshrc' ou reinicie o terminal para aplicar as mudanças.${NC}"
+    fi
+}
+
+# Função para gerar relatório final
+generate_health_report() {
+    local health_percentage=0
+    if [[ $total_checks -gt 0 ]]; then
+        health_percentage=$(( (passed_checks * 100) / total_checks ))
+    fi
+    
+    echo ""
+    echo "======================================================================"
+    echo -e "${PURPLE}                 RELATÓRIO DE SAÚDE DO AMBIENTE${NC}"
+    echo "======================================================================"
+    echo ""
+    echo -e "${GREEN}✅ Verificações aprovadas:${NC} $passed_checks/$total_checks"
+    echo -e "${YELLOW}⚠️  Problemas encontrados:${NC} $failed_checks"
+    
+    if [[ $fixed_issues -gt 0 ]]; then
+        echo -e "${BLUE}🔧 Problemas corrigidos:${NC} $fixed_issues"
+    fi
+    
+    echo ""
+    
+    # Status geral baseado na porcentagem
+    if [[ $health_percentage -ge 90 ]]; then
+        echo -e "${GREEN}🎉 Status Geral: EXCELENTE ($health_percentage%)${NC}"
+    elif [[ $health_percentage -ge 75 ]]; then
+        echo -e "${BLUE}👍 Status Geral: BOM ($health_percentage%)${NC}"  
+    elif [[ $health_percentage -ge 60 ]]; then
+        echo -e "${YELLOW}⚠️  Status Geral: REGULAR ($health_percentage%)${NC}"
+    else
+        echo -e "${RED}❌ Status Geral: CRÍTICO ($health_percentage%)${NC}"
+    fi
+    
+    if [[ $failed_checks -gt 0 ]]; then
+        echo ""
+        echo -e "${YELLOW}📋 Problemas encontrados:${NC}"
+        for issue in "${issues_found[@]}"; do
+            echo "   • $issue"
+        done
+        
+        if [[ ${#fixable_issues[@]} -gt 0 ]]; then
+            echo ""
+            echo -e "${BLUE}💡 Execute 'health-check --fix' para tentar corrigir automaticamente.${NC}"
+        fi
+    fi
+    
+    echo ""
+    echo "======================================================================"
+}
+
+# Função principal
+main() {
+    local auto_fix=false
+    local verbose=false
+    
+    # Processar argumentos
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --fix)
+                auto_fix=true
+                shift
+                ;;
+            --verbose|-v)
+                verbose=true
+                shift
+                ;;
+            --help|-h)
+                echo "Health Check - Verificador de saúde do ambiente WSL"
+                echo ""
+                echo "Uso:"
+                echo "  $0                  Executar verificação completa"
+                echo "  $0 --fix           Executar verificação e corrigir problemas"
+                echo "  $0 --verbose       Saída detalhada"
+                echo "  $0 --help          Mostrar esta ajuda"
+                echo ""
+                return 0
+                ;;
+            *)
+                log_error "Argumento desconhecido: $1"
+                echo "Use --help para ver as opções disponíveis."
+                exit 1
+                ;;
+        esac
+    done
+    
+    echo -e "${PURPLE}🏥 WSL Development Environment Health Check${NC}"
+    echo "======================================================================"
+    
+    # Criar/limpar log
+    echo "Health Check executado em $(date)" > "$HEALTH_LOG"
+    
+    # Executar verificações
+    check_zsh_setup
+    check_version_managers  
+    check_languages
+    check_git_config
+    check_dev_tools
+    check_permissions
+    
+    # Gerar relatório
+    generate_health_report
+    
+    # Tentar correções se solicitado
+    if [[ "$auto_fix" == "true" ]]; then
+        fix_issues
+        
+        # Executar nova verificação se foram feitas correções
+        if [[ $fixed_issues -gt 0 ]]; then
+            echo ""
+            echo -e "${BLUE}🔄 Executando nova verificação após correções...${NC}"
+            echo ""
+            
+            # Reset dos contadores
+            total_checks=0
+            passed_checks=0
+            failed_checks=0
+            issues_found=()
+            fixable_issues=()
+            
+            # Nova verificação (apenas as críticas)
+            check_zsh_setup
+            generate_health_report
+        fi
+    fi
+    
+    # Código de saída baseado nos resultados
+    if [[ $failed_checks -eq 0 ]]; then
+        return 0
+    elif [[ $passed_checks -gt $((total_checks / 2)) ]]; then
+        return 1
+    else
+        return 2
+    fi
+}
+
+# Executar apenas se o script for chamado diretamente
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi 
